@@ -3,9 +3,12 @@ package dashboardcontroller
 import (
 	"dashboard-ecommerce-team2/helper"
 	"dashboard-ecommerce-team2/service"
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 )
 
@@ -19,6 +22,13 @@ func NewDashboardController(service service.Service, log *zap.Logger) *Dashboard
 		Service: service,
 		Log:     log,
 	}
+}
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		// Allow all origins (modify this as needed)
+		return true
+	},
 }
 
 // @Summary Get dashboard summary
@@ -90,4 +100,37 @@ func (ctrl *DashboardController) GetBestProductListController(c *gin.Context) {
 		return
 	}
 	helper.ResponseOK(c, bestProduct, "best product list successfully retrieved", http.StatusOK)
+}
+
+func (ctrl *DashboardController) RevenueChartWebSocket(c *gin.Context) {
+	// Upgrade koneksi HTTP ke WebSocket
+	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		fmt.Println("Failed to upgrade connection:", err)
+		return
+	}
+	defer conn.Close()
+
+	fmt.Println("Client connected")
+
+	// Kirim data real-time ke klien
+	for {
+		// Simulasi data acak
+		totalOrder, err := ctrl.Service.Dashboard.GetTotalOrder()
+		if err != nil {
+			fmt.Println("Error getting total order:", err)
+			return
+		}
+		data := fmt.Sprintf(`{"timestamp": "%s", "value": %.2f}`, time.Now().Format(time.RFC3339), totalOrder)
+
+		// Kirim data ke klien
+		err = conn.WriteMessage(websocket.TextMessage, []byte(data))
+		if err != nil {
+			fmt.Println("Error writing message:", err)
+			break
+		}
+
+		// Delay sebelum mengirim data berikutnya
+		time.Sleep(1 * time.Second)
+	}
 }

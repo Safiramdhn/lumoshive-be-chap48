@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <canvas id="myChart" width="400" height="200"></canvas>
+    <script>
+        const ctx = document.getElementById('myChart').getContext('2d');
+        const myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Live Data',
+                    data: [],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+
+        const socket = new WebSocket('ws://localhost:8080/ws');
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+
+            // Tambahkan data ke chart
+            myChart.data.labels.push(data.timestamp);
+            myChart.data.datasets[0].data.push(data.value);
+
+            // Batasi jumlah data pada grafik
+            if (myChart.data.labels.length > 20) {
+                myChart.data.labels.shift();
+                myChart.data.datasets[0].data.shift();
+            }
+
+            myChart.update();
+        };
+
+        socket.onopen = function() {
+            console.log('WebSocket connected');
+        };
+
+        socket.onclose = function() {
+            console.log('WebSocket disconnected');
+        };
+    </script>
+</body>
+</html>

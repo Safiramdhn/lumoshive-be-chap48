@@ -13,6 +13,8 @@ func NewRoutes(ctx infra.ServiceContext) *gin.Engine {
 	r := gin.Default()
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	r.GET("/ws", ctx.Ctl.Dashboard.RevenueChartWebSocket)
+	r.Static("/static", "./static")
 
 	authMiddleware := ctx.Middleware.Authentication()
 	adminMiddleware := ctx.Middleware.RoleAuthorization("admin")
@@ -84,7 +86,7 @@ func authRoutes(r *gin.Engine, ctx infra.ServiceContext) {
 
 func dashboardRoutes(r *gin.Engine, ctx infra.ServiceContext) {
 	dashboardGroup := r.Group("/dashboard")
-	dashboardGroup.Use(ctx.Middleware.Authentication())
+	// dashboardGroup.Use(ctx.Middleware.Authentication())
 	{
 		dashboardGroup.GET("/summary", ctx.Ctl.Dashboard.GetSummaryController)
 		dashboardGroup.GET("/current-month-earning", ctx.Ctl.Dashboard.CurrentMonthEarningController)

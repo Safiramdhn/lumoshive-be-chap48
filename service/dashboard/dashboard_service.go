@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"dashboard-ecommerce-team2/models"
 	"dashboard-ecommerce-team2/repository"
+	"os"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ type DashboardService interface {
 	CurrentMonthEarning() (*models.Revenue, error)
 	GenerateRenevueChart() (*bytes.Buffer, error)
 	GetBestItemList() ([]models.BestProduct, error)
+	GetTotalOrder() (float64, error)
 }
 
 type dashboardService struct {
@@ -161,6 +163,58 @@ func (d *dashboardService) GenerateRenevueChart() (*bytes.Buffer, error) {
 	return buffer, nil
 }
 
+func (d *dashboardService) GenerateRenevueChartHTML() (*bytes.Buffer, error) {
+	monthlyEarning, err := d.Repo.Order.GetEarningEachMonth()
+	if err != nil {
+		d.Log.Error("Error getting monthly earning", zap.Error(err))
+		return nil, err
+	}
+	d.Log.Info("Monthly earning", zap.Any("Earning", monthlyEarning))
+
+	// Prepare data for the chart
+	xValues := make([]string, len(monthlyEarning))
+	yValues := make([]opts.LineData, len(monthlyEarning))
+
+	for i, entry := range monthlyEarning {
+		xValues[i] = entry.Month
+		yValues[i] = opts.LineData{Value: entry.TotalEarning}
+	}
+
+	line := charts.NewLine()
+
+	// Set chart options
+	line.SetGlobalOptions(
+		charts.WithTitleOpts(opts.Title{Title: "Monthly Revenue"}),
+		charts.WithXAxisOpts(opts.XAxis{Name: "Month"}),
+		charts.WithYAxisOpts(opts.YAxis{Name: "Revenue"}),
+	)
+
+	// Set X-axis and add series
+	line.SetXAxis(xValues).
+		AddSeries("Revenue", yValues).
+		SetSeriesOptions(charts.WithLineChartOpts(opts.LineChart{Smooth: opts.Bool(true)}))
+
+	// Render the chart into a buffer
+	buffer := new(bytes.Buffer)
+	if err := line.Render(buffer); err != nil {
+		return nil, err
+	}
+
+	// Save to static HTML file
+	staticFilePath := "./static/revenue_chart.html"
+	err = os.WriteFile(staticFilePath, buffer.Bytes(), 0644)
+	if err != nil {
+		d.Log.Error("Error saving chart HTML to file", zap.Error(err))
+		return nil, err
+	}
+
+	d.Log.Info("Revenue chart saved to file", zap.String("path", staticFilePath))
+	return buffer, nil
+}
+
+func (d *dashboardService) GetTotalOrder() (float64, error) {
+	return d.Repo.Order.CountTotalPriceOrder()
+}
 func NewDashboardService(repo repository.Repository, log *zap.Logger) DashboardService {
 	return &dashboardService{Repo: repo, Log: log}
 }
